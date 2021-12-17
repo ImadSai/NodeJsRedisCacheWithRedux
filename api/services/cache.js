@@ -14,9 +14,10 @@ redisClient.set = util.promisify(redisClient.set);
 const exec = mongoose.Query.prototype.exec;
 
 // Use the cache
-mongoose.Query.prototype.cache = function () {
+mongoose.Query.prototype.cache = function (options = {}) {
 
     this.useCache = true;
+    this.hashKey = JSON.stringify(options.key || '');
 
     // Return this to allow chain (ex: .cache().limit(10).blabla)
     return this;
@@ -41,10 +42,12 @@ mongoose.Query.prototype.exec = async function () {
     // Check if Key exists in cache
     const resultCached = await redisClient.get(keys);
     if (resultCached) {
+        console.log(('CAHCHE'));
         const doc = JSON.parse(resultCached);
         return Array.isArray(doc) ? doc.map(v => this.model(v)) : new this.model(doc);
     }
 
+    console.log('BDD');
     // Search for the value
     const result = await exec.apply(this);
 
@@ -53,3 +56,13 @@ mongoose.Query.prototype.exec = async function () {
 
     return result;
 }
+
+module.exports = {
+    cleanCache(userId) {
+        redisClient.keys(`*${userId}*blogs*`, (err, keys) => {
+            keys.forEach(key => {
+                redisClient.del(key);
+            });
+        });
+    }
+};
